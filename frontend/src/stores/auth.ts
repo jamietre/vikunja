@@ -203,6 +203,9 @@ export const useAuthStore = defineStore('auth', () => {
 			const response = await HTTP.post('login', objectToSnakeCase(credentials))
 			// Save the token to local storage for later use
 			saveToken(response.data.token, true)
+			// Reset the debounce so checkAuth() actually parses the new token
+			// instead of silently returning due to the 1-minute throttle.
+			lastUserInfoRefresh.value = null
 
 			// Tell others the user is authenticated
 			await checkAuth()
@@ -276,6 +279,9 @@ export const useAuthStore = defineStore('auth', () => {
 			// Save the token to local storage for later use
 			saveToken(response.data.token, true)
 			setLoggedInVia(provider)
+			// Reset the debounce so checkAuth() actually parses the new token
+			// instead of silently returning due to the 1-minute throttle.
+			lastUserInfoRefresh.value = null
 
 			// Tell others the user is authenticated
 			await checkAuth()
@@ -290,6 +296,9 @@ export const useAuthStore = defineStore('auth', () => {
 			removeToken()
 			saveToken(tokens.access_token, true)
 			localStorage.setItem('desktopOAuthRefreshToken', tokens.refresh_token)
+			// Reset the debounce so checkAuth() actually parses the new token
+			// instead of silently returning due to the 1-minute throttle.
+			lastUserInfoRefresh.value = null
 			await checkAuth()
 		} finally {
 			setIsLoading(false)
