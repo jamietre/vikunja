@@ -172,6 +172,7 @@
 					"yyyy/mm/dd": "YYYY/MM/DD"
 				},
 				"timeFormat": "Формат часу",
+				"timeTrackingDefaultStart": "Початковий час для автоматичного заповнення обліку часу",
 				"timeFormatOptions": {
 					"12h": "12-годинний (AM/PM)",
 					"24h": "24-годинний (HH:mm)"
@@ -348,6 +349,7 @@
 		"shared": "Спільні проєкти",
 		"noDescriptionAvailable": "Опису проєкту немає.",
 		"inboxTitle": "Вхідні",
+		"myOpenTasksFilterTitle": "Мої відкриті завдання",
 		"favorite": "Додати до обраних",
 		"unfavorite": "Прибрати з обраних",
 		"openSettingsMenu": "Відкрити меню налаштувань проєкту",
@@ -392,6 +394,7 @@
 			"title": "Дублювати цей проєкт",
 			"label": "Дублювати",
 			"text": "Оберіть батьківський проєкт, який повинен складатися з дубльованих проєктів:",
+			"shares": "Скопіювати налаштування спільного доступу (користувачів, команди та посилання) до копії проєкту",
 			"success": "Проєкт дубльовано."
 		},
 		"edit": {
@@ -781,7 +784,10 @@
 		"closeDialog": "Закрити діалог",
 		"closeQuickActions": "Закрити швидкі дії",
 		"skipToContent": "Перейти до основного вмісту",
-		"sortBy": "Сортувати за"
+		"sortBy": "Сортувати за",
+		"dateRange": "Діапазон дат",
+		"notSet": "Не встановлено",
+		"user": "Користувач"
 	},
 	"input": {
 		"projectColor": "Колір проєкту",
@@ -984,13 +990,14 @@
 				"assign": "Доручити",
 				"label": "Позначки",
 				"priority": "Встановити пріоритет",
-				"dueDate": "Встановити термін",
+				"dueDate": "Встановити термін виконання",
 				"startDate": "Почати",
 				"endDate": "Встановити дату завершення",
 				"reminders": "Нагадування",
 				"repeatAfter": "Повторювати",
 				"percentDone": "Встановити прогрес",
 				"attachments": "Вкласти",
+				"timeTracking": "Відстежити час",
 				"relatedTasks": "Пов'язати",
 				"moveProject": "Перемістити",
 				"duplicate": "Дублювати",
@@ -1146,6 +1153,7 @@
 		"repeat": {
 			"everyDay": "Щодня",
 			"everyWeek": "Щотижня",
+			"every30d": "Кожні 30 днів",
 			"mode": "Спосіб",
 			"monthly": "Щомісяця",
 			"fromCurrentDate": "З дня закінчення",
@@ -1459,6 +1467,32 @@
 		"frontendVersion": "Версія інтерфейсу: {version}",
 		"apiVersion": "API версія: {version}"
 	},
+	"timeTracking": {
+		"title": "Відстеження часу",
+		"stop": "Зупинити таймер",
+		"logTime": "Записати час",
+		"editEntry": "Редагувати запис",
+		"form": {
+			"task": "Завдання",
+			"taskSearch": "Знайти завдання…",
+			"commentPlaceholder": "Над чим ви працювали?",
+			"save": "Зберегти запис",
+			"startTimer": "Запустити таймер",
+			"update": "Оновити запис",
+			"smartFill": "Заповнити з останнього запису"
+		},
+		"list": {
+			"emptyTask": "Для цього завдання ще немає записів обліку часу.",
+			"emptyFiltered": "Немає записів обліку часу для вибраних фільтрів.",
+			"total": "Загалом",
+			"time": "Час",
+			"duration": "Тривалість"
+		},
+		"browse": {
+			"selectRange": "Обрати діапазон",
+			"userSearch": "Знайти користувача…"
+		}
+	},
 	"time": {
 		"units": {
 			"seconds": "секунда|секунд(и)",
@@ -1511,6 +1545,11 @@
 			"skipEmailConfirm": "Пропустити підтвердження ел. пошти",
 			"createSubmit": "Створити користувача",
 			"saveButton": "Зберегти зміни",
+			"newPasswordLabel": "Новий пароль",
+			"setPassword": "Встановити пароль",
+			"setPasswordSuccess": "Пароль для {username} оновлено.",
+			"sendResetEmail": "Надіслати лист для скидання пароля",
+			"sendResetEmailSuccess": "Лист для скидання пароля надіслано користувачу {username}.",
 			"createdSuccess": "Користувача {username} створено.",
 			"updatedSuccess": "Користувача {username} оновлено.",
 			"deletedSuccess": "Користувача {username} вилучено.",

@@ -19,6 +19,7 @@ package initialize
 import (
 	"time"
 
+	"code.vikunja.io/api/pkg/audit"
 	"code.vikunja.io/api/pkg/config"
 	"code.vikunja.io/api/pkg/cron"
 	"code.vikunja.io/api/pkg/db"
@@ -98,6 +99,12 @@ func FullInitWithoutAsync() {
 	// See the package comment in pkg/license/license.go before removing.
 	license.Init()
 
+	if config.AuditEnabled.GetBool() {
+		if err := audit.Init(); err != nil {
+			log.Fatalf("Could not initialize audit logging: %s", err)
+		}
+	}
+
 	// Start the mail daemon
 	mail.StartMailDaemon()
 
@@ -130,6 +137,7 @@ func FullInit() {
 	models.RegisterReminderCron()
 	models.RegisterOverdueReminderCron()
 	models.RegisterUserDeletionCron()
+	models.RegisterTaskCleanupCron()
 	models.RegisterOldExportCleanupCron()
 	models.RegisterAddTaskToFilterViewCron()
 	user.RegisterTokenCleanupCron()
@@ -137,6 +145,7 @@ func FullInit() {
 	user.RegisterDeletionNotificationCron()
 	openid.CleanupSavedOpenIDProviders()
 	openid.RegisterEmptyOpenIDTeamCleanupCron()
+	openid.RegisterProviderAvailabilityCron()
 	models.RegisterAPITokenExpiryCheckCron()
 
 	// Initialize WebSocket hub

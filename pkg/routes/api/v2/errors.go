@@ -28,6 +28,7 @@ import (
 	"code.vikunja.io/api/pkg/web"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/labstack/echo/v5"
 )
 
 // authFromCtx retrieves the authed user from a Huma handler context,
@@ -63,9 +64,12 @@ func translateDomainError(err error) error {
 		se := huma.NewError(details.HTTPCode, msg)
 		// Preserve Vikunja's numeric domain error code (the value the
 		// error docs key off) on the problem+json body. v1 exposes it as
-		// `code`; without this v2 clients always read 0.
+		// `code`; without this v2 clients always read 0. I18nParams rides
+		// along the same way so v2 clients can localise the message like
+		// v1 clients do.
 		if vm, ok := se.(*vikunjaErrorModel); ok {
 			vm.Code = details.Code
+			vm.I18nParams = details.I18nParams
 		}
 		return se
 	}
@@ -79,6 +83,17 @@ func translateDomainError(err error) error {
 			vm.Code = ve.GetCode()
 		}
 		return se
+	}
+	// Shared transport-agnostic cores (e.g. auth.RefreshSession) signal HTTP
+	// semantics with *echo.HTTPError. v1 lets echo's error handler render it;
+	// without this it would fall through as a 500 on v2.
+	var he *echo.HTTPError
+	if errors.As(err, &he) {
+		msg := he.Message
+		if msg == "" {
+			msg = http.StatusText(he.Code)
+		}
+		return huma.NewError(he.Code, msg)
 	}
 	return err
 }
@@ -103,7 +118,8 @@ func invalidFieldDetails(fields []string) []error {
 // as the global error type via the huma.NewError override in init().
 type vikunjaErrorModel struct {
 	huma.ErrorModel
-	Code int `json:"code,omitempty" readOnly:"true" doc:"Vikunja numeric error code; see https://vikunja.io/docs/errors/"`
+	Code       int               `json:"code,omitempty" readOnly:"true" doc:"Vikunja numeric error code; see https://vikunja.io/docs/errors/"`
+	I18nParams map[string]string `json:"i18n_params,omitempty" readOnly:"true" doc:"Dynamic values referenced by the error message, keyed by translation placeholder name, for client-side localisation."`
 }
 
 func init() {
@@ -134,7 +150,7 @@ func init() {
 
 	// Strip internal detail from server errors. Huma's handler-error path
 	// wraps a raw error as NewErrorWithContext(ctx, 500, "unexpected error
-	// occurred", err) and — because the humaecho5 adapter writes the
+	// occurred", err) and — because the humaecho adapter writes the
 	// response itself — bypasses Vikunja's CreateHTTPErrorHandler, which for
 	// v1 returns a generic 500 with no detail. Without this override a raw
 	// DB/driver error (SQL, table, column names) would leak into the

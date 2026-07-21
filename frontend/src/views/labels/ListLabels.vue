@@ -5,7 +5,7 @@
 	>
 		<XButton
 			:to="{name:'labels.create'}"
-			class="is-pulled-right"
+			class="is-pulled-end"
 			icon="plus"
 		>
 			{{ $t('label.create.header') }}
@@ -40,6 +40,7 @@
 					<BaseButton
 						v-if="userInfo.id === label.createdBy.id"
 						class="label-edit-button is-small"
+						:aria-label="$t('label.edit.header')"
 						@click.stop.prevent="editLabel(label)"
 					>
 						<Icon
@@ -89,6 +90,7 @@
 								<XButton
 									icon="trash-alt"
 									danger
+									:aria-label="$t('task.label.delete.header')"
 									@click="showDeleteDialoge(labelEditLabel)"
 								/>
 							</div>

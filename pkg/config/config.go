@@ -92,14 +92,15 @@ const (
 	AuthLdapVerifyTLS  Key = `auth.ldap.verifytls`
 	AuthLdapBindDN     Key = `auth.ldap.binddn`
 	// #nosec G101
-	AuthLdapBindPassword         Key = `auth.ldap.bindpassword`
-	AuthLdapGroupSyncEnabled     Key = `auth.ldap.groupsyncenabled`
-	AuthLdapGroupSyncFilter      Key = `auth.ldap.groupsyncfilter`
-	AuthLdapAvatarSyncAttribute  Key = `auth.ldap.avatarsyncattribute`
-	AuthLdapAttributeUsername    Key = `auth.ldap.attribute.username`
-	AuthLdapAttributeEmail       Key = `auth.ldap.attribute.email`
-	AuthLdapAttributeDisplayname Key = `auth.ldap.attribute.displayname`
-	AuthLdapAttributeMemberID    Key = `auth.ldap.attribute.memberid`
+	AuthLdapBindPassword               Key = `auth.ldap.bindpassword`
+	AuthLdapGroupSyncEnabled           Key = `auth.ldap.groupsyncenabled`
+	AuthLdapGroupSyncFilter            Key = `auth.ldap.groupsyncfilter`
+	AuthLdapGroupSyncUseServiceAccount Key = `auth.ldap.groupsyncuseserviceaccount`
+	AuthLdapAvatarSyncAttribute        Key = `auth.ldap.avatarsyncattribute`
+	AuthLdapAttributeUsername          Key = `auth.ldap.attribute.username`
+	AuthLdapAttributeEmail             Key = `auth.ldap.attribute.email`
+	AuthLdapAttributeDisplayname       Key = `auth.ldap.attribute.displayname`
+	AuthLdapAttributeMemberID          Key = `auth.ldap.attribute.memberid`
 
 	LegalImprintURL Key = `legal.imprinturl`
 	LegalPrivacyURL Key = `legal.privacyurl`
@@ -220,6 +221,11 @@ const (
 	WebhooksProxyPassword       Key = `webhooks.proxypassword`
 	WebhooksAllowNonRoutableIPs Key = `webhooks.allownonroutableips`
 
+	AuditEnabled           Key = `audit.enabled`
+	AuditLogfile           Key = `audit.logfile`
+	AuditRotationMaxSizeMB Key = `audit.rotation.maxsizemb`
+	AuditRotationMaxAge    Key = `audit.rotation.maxage`
+
 	OutgoingRequestsAllowNonRoutableIPs Key = `outgoingrequests.allownonroutableips`
 	OutgoingRequestsProxyURL            Key = `outgoingrequests.proxyurl`
 	OutgoingRequestsProxyPassword       Key = `outgoingrequests.proxypassword`
@@ -281,8 +287,9 @@ var timezone *time.Location
 // It is a separate function and not done through viper because that makes handling
 // it way easier, especially when testing.
 func GetTimeZone() *time.Location {
-	if timezone == nil {
-		loc, err := time.LoadLocation(ServiceTimeZone.GetString())
+	tz := ServiceTimeZone.GetString()
+	if timezone == nil || timezone.String() != tz {
+		loc, err := time.LoadLocation(tz)
 		if err != nil {
 			log.Fatalf("Error parsing time zone: %s", err)
 		}
@@ -362,7 +369,6 @@ func InitDefaultConfig() {
 	ServiceEnableUserDeletion.setDefault(true)
 	ServiceMaxAvatarSize.setDefault(1024)
 	ServiceDemoMode.setDefault(false)
-	ServiceAllowIconChanges.setDefault(true)
 	ServiceEnablePublicTeams.setDefault(false)
 	ServiceBcryptRounds.setDefault(11)
 	ServiceEnableOpenIDTeamUserOnlySearch.setDefault(false)
@@ -384,6 +390,7 @@ func InitDefaultConfig() {
 	AuthLdapVerifyTLS.setDefault(true)
 	AuthLdapGroupSyncEnabled.setDefault(false)
 	AuthLdapGroupSyncFilter.setDefault("(&(objectclass=*)(|(objectclass=group)(objectclass=groupOfNames)))")
+	AuthLdapGroupSyncUseServiceAccount.setDefault(false)
 	AuthLdapAttributeUsername.setDefault("uid")
 	AuthLdapAttributeEmail.setDefault("mail")
 	AuthLdapAttributeDisplayname.setDefault("displayName")
@@ -483,6 +490,11 @@ func InitDefaultConfig() {
 	WebhooksEnabled.setDefault(true)
 	WebhooksTimeoutSeconds.setDefault(30)
 	WebhooksAllowNonRoutableIPs.setDefault(false)
+	// Audit
+	AuditEnabled.setDefault(false)
+	AuditLogfile.setDefault("") // empty means <log.path>/audit.log, resolved at init
+	AuditRotationMaxSizeMB.setDefault(100)
+	AuditRotationMaxAge.setDefault(30)
 	// Outgoing Requests
 	OutgoingRequestsAllowNonRoutableIPs.setDefault(false)
 	OutgoingRequestsTimeoutSeconds.setDefault(30)

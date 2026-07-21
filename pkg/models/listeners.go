@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"time"
 
+	"code.vikunja.io/api/pkg/audit"
 	"code.vikunja.io/api/pkg/config"
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/events"
@@ -82,6 +83,334 @@ func RegisterListeners() {
 		// Internal delivery listener — one message per webhook with its own retry lifecycle
 		events.RegisterListener((&WebhookDeliveryEvent{}).Name(), &WebhookDeliveryListener{})
 	}
+	if config.AuditEnabled.GetBool() {
+		registerEventsForAuditLogging()
+	}
+}
+
+func auditActorFromUser(u *user.User) audit.Actor {
+	if u == nil {
+		return audit.SystemActor()
+	}
+	return audit.ActorFromDoerID(u.ID)
+}
+
+// registerEventsForAuditLogging opts events into audit logging. This block is
+// the catalog of the entire audited surface — an event without a registration
+// here is not audited.
+func registerEventsForAuditLogging() {
+	// Auth boundary
+	audit.RegisterEventForAudit(func(e *user.LoginSucceededEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionLoginSucceeded,
+			Actor:  audit.UserActor(e.User.ID),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *user.LoginFailedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:  audit.ActionLoginFailed,
+			Actor:   audit.UserActor(e.User.ID),
+			Target:  audit.UserTarget(e.User.ID),
+			Outcome: audit.OutcomeFailure,
+			Reason:  "wrong password",
+		}
+	})
+	audit.RegisterEventForAudit(func(e *user.LogoutEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionLogout,
+			Actor:  audit.UserActor(e.UserID),
+			Target: audit.UserTarget(e.UserID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *APITokenIssuedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionAPITokenIssued,
+			Actor:    audit.UserActor(e.DoerID),
+			Target:   audit.APITokenTarget(e.TokenID),
+			Metadata: map[string]any{"owner_id": e.OwnerID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *APITokenRevokedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAPITokenRevoked,
+			Actor:  audit.UserActor(e.DoerID),
+			Target: audit.APITokenTarget(e.TokenID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *APITokenUsedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAPITokenUsed,
+			Actor:  audit.UserActor(e.OwnerID),
+			Target: audit.APITokenTarget(e.TokenID),
+		}
+	})
+
+	// Users
+	audit.RegisterEventForAudit(func(e *user.CreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionUserCreated,
+			Actor:  audit.UserActor(e.User.ID),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+
+	// Tasks
+	audit.RegisterEventForAudit(func(e *TaskCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTaskCreated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TaskTarget(e.Task.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskUpdatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTaskUpdated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TaskTarget(e.Task.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTaskDeleted,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TaskTarget(e.Task.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskAssigneeCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskAssigneeAdded,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"assignee_id": e.Assignee.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskAssigneeDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskAssigneeRemoved,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"assignee_id": e.Assignee.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskCommentCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskCommentCreated,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"comment_id": e.Comment.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskCommentUpdatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskCommentUpdated,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"comment_id": e.Comment.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskCommentDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskCommentDeleted,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"comment_id": e.Comment.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskAttachmentCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskAttachmentCreated,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"attachment_id": e.Attachment.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskAttachmentDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTaskAttachmentDeleted,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{"attachment_id": e.Attachment.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskRelationCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTaskRelationCreated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{
+				"other_task_id": e.Relation.OtherTaskID,
+				"relation_kind": e.Relation.RelationKind,
+			},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TaskRelationDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTaskRelationDeleted,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TaskTarget(e.Task.ID),
+			Metadata: map[string]any{
+				"other_task_id": e.Relation.OtherTaskID,
+				"relation_kind": e.Relation.RelationKind,
+			},
+		}
+	})
+
+	// Projects
+	audit.RegisterEventForAudit(func(e *ProjectCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionProjectCreated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.ProjectTarget(e.Project.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *ProjectUpdatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionProjectUpdated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.ProjectTarget(e.Project.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *ProjectDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionProjectDeleted,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.ProjectTarget(e.Project.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *ProjectSharedWithUserEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionProjectSharedWithUser,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.ProjectTarget(e.Project.ID),
+			Metadata: map[string]any{"user_id": e.User.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *ProjectSharedWithTeamEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionProjectSharedWithTeam,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.ProjectTarget(e.Project.ID),
+			Metadata: map[string]any{"team_id": e.Team.ID},
+		}
+	})
+
+	// Teams
+	audit.RegisterEventForAudit(func(e *TeamCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTeamCreated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TeamTarget(e.Team.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TeamDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionTeamDeleted,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.TeamTarget(e.Team.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TeamMemberAddedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTeamMemberAdded,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TeamTarget(e.Team.ID),
+			Metadata: map[string]any{"member_id": e.Member.ID},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *TeamMemberRemovedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionTeamMemberRemoved,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.TeamTarget(e.Team.ID),
+			Metadata: map[string]any{"member_id": e.Member.ID},
+		}
+	})
+
+	// Admin actions
+	audit.RegisterEventForAudit(func(e *AdminUserCreatedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUserCreated,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUserAdminGrantedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUserAdminGranted,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUserAdminRevokedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUserAdminRevoked,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUserStatusChangedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUserStatusChanged,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.UserTarget(e.User.ID),
+			Metadata: map[string]any{
+				"old_status": e.OldStatus,
+				"new_status": e.NewStatus,
+			},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUserPasswordSetEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUserPasswordSet,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUserPasswordResetSentEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUserPasswordResetSent,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.UserTarget(e.User.ID),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUserDeletedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:   audit.ActionAdminUserDeleted,
+			Actor:    auditActorFromUser(e.Doer),
+			Target:   audit.UserTarget(e.User.ID),
+			Metadata: map[string]any{"mode": e.Mode},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminProjectOwnerChangedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminProjectOwnerChanged,
+			Actor:  auditActorFromUser(e.Doer),
+			Target: audit.ProjectTarget(e.Project.ID),
+			Metadata: map[string]any{
+				"old_owner_id": e.OldOwnerID,
+				"new_owner_id": e.NewOwnerID,
+			},
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminUsersListedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action: audit.ActionAdminUsersListed,
+			Actor:  auditActorFromUser(e.Doer),
+		}
+	})
+	audit.RegisterEventForAudit(func(e *AdminAccessDeniedEvent) *audit.Entry {
+		return &audit.Entry{
+			Action:  audit.ActionAdminAccessDenied,
+			Actor:   auditActorFromUser(e.Doer),
+			Outcome: audit.OutcomeFailure,
+			Reason:  "not an instance admin",
+			Metadata: map[string]any{
+				"method": e.Method,
+				"path":   e.Path,
+			},
+		}
+	})
 }
 
 //////
@@ -540,6 +869,20 @@ func (s *HandleTaskUpdateLastUpdated) Handle(msg *message.Message) (err error) {
 		return err
 	}
 
+	// Also bump the project so the CalDAV ctag advances on changes to
+	// task sub-entities (relations, comments, attachments, assignees).
+	fullTask, err := GetTaskByIDSimple(sess, taskIDInt)
+	if err != nil {
+		if IsErrTaskDoesNotExist(err) {
+			return sess.Commit()
+		}
+		return err
+	}
+	err = updateProjectLastUpdated(sess, &Project{ID: fullTask.ProjectID})
+	if err != nil {
+		return err
+	}
+
 	return sess.Commit()
 }
 
@@ -658,7 +1001,10 @@ func (l *UpdateTaskInSavedFilterViews) Handle(msg *message.Message) (err error) 
 		if err != nil {
 			return
 		}
-		_, err = s.Insert(taskPositions)
+		// A request healing the same filter view can insert a position row for
+		// this task between the delete above and this insert, so skip rows
+		// which exist by now instead of failing on the unique index.
+		err = bulkInsertTaskPositions(s, taskPositions, false)
 		if err != nil {
 			return
 		}

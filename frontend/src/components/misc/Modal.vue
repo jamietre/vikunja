@@ -8,6 +8,7 @@
 				{ 'has-overflow': overflow },
 				variant,
 			]"
+			:aria-labelledby="headerLabelId"
 			v-bind="attrs"
 			@cancel.prevent="$emit('close')"
 		>
@@ -30,7 +31,10 @@
 					}"
 				>
 					<slot>
-						<div class="modal-header">
+						<div
+							:id="headerId"
+							class="modal-header"
+						>
 							<slot name="header" />
 						</div>
 						<div class="content">
@@ -62,13 +66,13 @@
 
 <script lang="ts" setup>
 import BaseButton from '@/components/base/BaseButton.vue'
-import {ref, useAttrs, watch, onBeforeUnmount, onMounted} from 'vue'
+import {computed, ref, useAttrs, useId, useSlots, watch, onBeforeUnmount, onMounted} from 'vue'
 
 const props = withDefaults(defineProps<{
 	enabled?: boolean,
 	overflow?: boolean,
 	wide?: boolean,
-	variant?: 'default' | 'hint-modal' | 'scrolling',
+	variant?: 'default' | 'hint-modal' | 'scrolling' | 'top',
 }>(), {
 	enabled: true,
 	overflow: false,
@@ -85,6 +89,13 @@ defineOptions({
 const TRANSITION_DURATION = 150
 
 const attrs = useAttrs()
+const slots = useSlots()
+const headerId = useId()
+// Name the dialog from its header when the fallback layout renders one and the
+// caller didn't pass an explicit aria-label through the attrs.
+const headerLabelId = computed(() =>
+	!attrs['aria-label'] && !slots.default && slots.header ? headerId : undefined,
+)
 const dialogRef = ref<HTMLDialogElement | null>(null)
 const previouslyFocused = ref<Element | null>(null)
 const showDialog = ref(false)
@@ -211,7 +222,13 @@ $modal-width: 1024px;
 	// Reset UA dialog styles
 	padding: 0;
 	border: none;
-	background: transparent;
+	// The scrim lives on the dialog element, not on ::backdrop: Chromium
+	// intermittently stops painting a styled ::backdrop (e.g. after the
+	// dialog's subtree re-renders, or while display is transitioned) even
+	// though getComputedStyle still reports the color. The dialog fills the
+	// viewport anyway, and its opacity transition fades the scrim with it —
+	// same as the old div-based .modal-mask.
+	background: rgba(0, 0, 0, .8);
 	color: #ffffff;
 	// Fill viewport
 	position: fixed;
@@ -221,10 +238,12 @@ $modal-width: 1024px;
 	max-inline-size: 100%;
 	max-block-size: 100%;
 
-	// Transitions
+	// Transitions. No display/allow-discrete transition needed: the close
+	// fade runs while the dialog is still [open] (data-closing + timer in
+	// closeDialog), and transitioning display triggers the Chromium paint
+	// bug above.
 	opacity: 0;
-	transition: opacity 150ms ease,
-				display 150ms ease allow-discrete;
+	transition: opacity 150ms ease;
 
 	&[open]:not([data-closing]) {
 		opacity: 1;
@@ -236,16 +255,11 @@ $modal-width: 1024px;
 
 	&::backdrop {
 		background-color: rgba(0, 0, 0, 0);
-		transition: background-color 150ms ease,
-					display 150ms ease allow-discrete;
 	}
 
-	&[open]:not([data-closing])::backdrop {
-		background-color: rgba(0, 0, 0, .8);
-
-		@starting-style {
-			background-color: rgba(0, 0, 0, 0);
-		}
+	// in quick-add mode the Electron window itself is the overlay — no scrim
+	&:has(.is-quick-add-mode) {
+		background: transparent;
 	}
 }
 
@@ -261,13 +275,20 @@ $modal-width: 1024px;
 }
 
 .default .modal-content,
-.hint-modal .modal-content {
+.hint-modal .modal-content,
+.top .modal-content {
 	text-align: center;
 	position: absolute;
 	// fine to use top/left since we're only using this to position it centered
 	inset-block-start: 50%;
 	inset-inline-start: 50%;
 	transform: translate(-50%, -50%);
+	// Cap centered content to the viewport and scroll inside it. Without this a
+	// taller-than-viewport modal centres its top edge above the viewport, where
+	// the container's overflow can't scroll to it (the .top variant overrides
+	// both values below).
+	max-block-size: calc(100dvh - 2rem);
+	overflow: auto;
 
 	[dir="rtl"] & {
 		transform: translate(50%, -50%);
@@ -277,6 +298,9 @@ $modal-width: 1024px;
 		margin: 0;
 		position: static;
 		transform: none;
+		// the fullscreen mobile layout flows and scrolls in .modal-container
+		max-block-size: none;
+		overflow: visible;
 	}
 
 	.modal-header {
@@ -289,11 +313,31 @@ $modal-width: 1024px;
 	}
 }
 
+// anchored below the top edge instead of centered, used for QuickActions
+.top .modal-content {
+	inset-block-start: 3rem;
+	transform: translate(-50%, 0);
+	max-block-size: calc(100dvh - 6rem);
+	overflow: auto;
+
+	[dir="rtl"] & {
+		transform: translate(50%, 0);
+	}
+
+	// the fullscreen mobile layout flows and scrolls in .modal-container
+	@media screen and (max-width: $tablet) {
+		transform: none;
+		max-block-size: none;
+		overflow: visible;
+	}
+}
+
 // Default width for centered modals. Scoped with :not(.is-wide) so the
 // `wide` prop can still expand the modal (the .is-wide rule below would
 // otherwise be outranked by .default .modal-content's specificity).
 .default .modal-content:not(.is-wide),
-.hint-modal .modal-content:not(.is-wide) {
+.hint-modal .modal-content:not(.is-wide),
+.top .modal-content:not(.is-wide) {
 	inline-size: calc(100% - 2rem);
 	max-inline-size: 640px;
 
@@ -403,6 +447,7 @@ $modal-width: 1024px;
 		block-size: auto;
 		max-inline-size: none;
 		max-block-size: none;
+		background: transparent;
 
 		&::backdrop {
 			display: none;
