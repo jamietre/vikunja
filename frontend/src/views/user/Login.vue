@@ -55,7 +55,6 @@
 					v-model="password"
 					:validate-initially="validatePasswordInitially"
 					:validate-min-length="false"
-					@submit="submit"
 				/>
 			</div>
 			<FormField
@@ -209,6 +208,12 @@ const needsTotpPasscode = computed(() => authStore.needsTotpPasscode)
 const totpPasscode = ref<HTMLInputElement | null>(null)
 
 async function submit() {
+	// Native form submit and this handler can both fire for a single Enter
+	// keypress; without this guard that races two concurrent logins.
+	if (isLoading.value) {
+		return
+	}
+
 	errorMessage.value = ''
 	// Some browsers prevent Vue bindings from working with autofilled values.
 	// To work around this, we're manually getting the values here instead of relying on vue bindings.
