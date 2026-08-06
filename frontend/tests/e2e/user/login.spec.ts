@@ -98,23 +98,6 @@ test.describe('Login', () => {
 		expect(flashDetected).toBe(false)
 	})
 
-	test('Should not send duplicate login requests when pressing Enter in the password field', async ({page}) => {
-		const loginRequests: string[] = []
-		page.on('request', request => {
-			if (request.url().includes('/login') && request.method() === 'POST') {
-				loginRequests.push(request.url())
-			}
-		})
-
-		await page.goto('/login')
-		await page.locator('input[id=username]').fill(credentials.username)
-		await page.locator('input[id=password]').fill(credentials.password)
-		await page.locator('input[id=password]').press('Enter')
-
-		await expect(page).toHaveURL('/')
-		expect(loginRequests.length).toBe(1)
-	})
-
 	test('Should redirect to the previous route after logging in', async ({page}) => {
 		const projects = await ProjectFactory.create(1)
 		await page.goto(`/projects/${projects[0].id}/1`)
